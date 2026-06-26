@@ -32,4 +32,4 @@ devpod context set-options -o EXIT_AFTER_TIMEOUT=false
 
 citadel's GitHub SSH key started as a deploy key scoped to the private dotfiles repo. GitHub won't let the same key be both a deploy key and an account-level key, so I ended up promoting it to account-level, which also means citadel can push directly rather than relaying through another machine.
 
-Container is running. Next: create the k3s cluster and wire up the kubeconfig.
+Container is running. k3s is already installed on citadel; next is starting the service, exporting the generated kubeconfig into the repo root, and running `direnv allow` so the container picks it up automatically.
