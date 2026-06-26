@@ -2,37 +2,38 @@
 
 ---
 
-## 2026-06-26
+## 2026-06-26 — Container workflow confirmed; devpod mental model corrected
 
-Getting the devpod workflow running on citadel.
+Ran `devpod up --recreate citadel-learning` to rebuild the container with the updated `devcontainer.json`. The terminal hung after the container came up — devpod holds the foreground SSH connection open rather than returning the prompt. Ctrl+C detaches cleanly; the container keeps running.
 
-I installed Ubuntu 26.04 on citadel hesitantly; it was new and I knew that meant rough edges, but the LTS label made me less careful than I should have been. When Docker wouldn't set up through apt I did some research, late at night, not thoroughly. Found enough to confirm what I'd already half-decided: that I'd made a mistake not going with 24.04. I left it there.
+A batch of port-forwarding errors appeared during startup:
 
-A few days later I actually checked the assumption. Docker has supported Ubuntu 26.04 since day one. The problem was a previous install attempt had created
 ```
-/etc/apt/sources.list.d/docker.list
-```
-but left it empty. Added the repo properly and it worked immediately.
-
-The course I'm following (KubeCraft HomeLabOS) is built around a Raspberry Pi. I'm adapting it for a Threadripper 1950X with 64GB RAM, more headroom, same approach. The idea is directory-based cluster isolation via devpod: each cluster lives in its own repo with its own kubeconfig and `.envrc`. direnv exports `KUBECONFIG` automatically when you cd in, so you can't accidentally kubectl at the wrong cluster.
-
-Tools (flux, kubectl, k9s, direnv) are installed into the container via a dotfiles setup script on creation, not baked into the image. devpod up pulled the Debian base image, cloned the dotfiles, ran the setup script, and everything came up.
-
-A few other things that needed sorting:
-
-devpod needs an SSH agent on the host to forward credentials into the container for cloning private repos. Set it up in the wrong place first; bashrc exits early for non-interactive shells, which is what devpod uses internally.
-```
-SSH_AUTH_SOCK needs to be in ~/.profile, not ~/.bashrc
+error Error port forwarding 6443: listen tcp 127.0.0.1:6443: bind: address already in use
+error Error port forwarding 10250: listen tcp 127.0.0.1:10250: bind: address already in use
 ```
 
-devpod also kills idle workspaces by default. First successful run shut itself down after a minute because nothing was connected to the browser UI.
-```
-devpod context set-options -o EXIT_AFTER_TIMEOUT=false
+These look alarming but aren't. devpod attempts to forward k3s-related ports from the container to the host. Because the container runs with `--network=host`, it shares citadel's network stack entirely — k3s already owns those ports on the host, and the container and host are the same network namespace. devpod's forwarding attempts fail immediately, which is the correct outcome. kubectl works fine.
+
+The other thing that needed correcting was where to run devpod commands from. The general devpod mental model is client on your workstation, Docker provider on the remote machine. That's not how this is set up. devpod is installed on citadel, at `~/.local/bin/devpod`, using the local docker provider. citadel is both the client and the host. The correct flow from fz55 is: `ssh citadel`, then `devpod ssh citadel-learning`. Running `devpod ssh citadel-learning` from fz55 gets `command not found`.
+
+Inside the container, the default user is `vscode` — the devcontainers base image creates that user regardless of whether VS Code is involved. It's part of the devcontainer standard.
+
+direnv needs a one-time approval after container creation:
+
+```bash
+direnv allow
 ```
 
-citadel's GitHub SSH key started as a deploy key scoped to the private dotfiles repo. GitHub won't let the same key be both a deploy key and an account-level key, so I ended up promoting it to account-level, which also means citadel can push directly rather than relaying through another machine.
+After that, KUBECONFIG exports automatically on entry. Confirmed working:
 
-Container is running. k3s is already installed on citadel; next is starting the service, exporting the generated kubeconfig into the repo root, and running `direnv allow` so the container picks it up automatically.
+```
+kubectl get nodes
+NAME      STATUS   ROLES           AGE     VERSION
+citadel   Ready    control-plane   4d23h   v1.36.2+k3s1
+```
+
+Cluster is reachable from inside the container. The stack is ready: kubectl, flux, k9s, direnv, zsh, neovim — all present. Starting the Kubecraft HomeLabOS curriculum from here.
 
 ---
 
@@ -90,35 +91,34 @@ Both approaches share the same KUBECONFIG pattern: `.envrc` + gitignored `kubeco
 
 ---
 
-## 2026-06-26 — Container workflow confirmed; devpod mental model corrected
+## 2026-06-26
 
-Ran `devpod up --recreate citadel-learning` to rebuild the container with the updated `devcontainer.json`. The terminal hung after the container came up — devpod holds the foreground SSH connection open rather than returning the prompt. Ctrl+C detaches cleanly; the container keeps running.
+Getting the devpod workflow running on citadel.
 
-A batch of port-forwarding errors appeared during startup:
+I installed Ubuntu 26.04 on citadel hesitantly; it was new and I knew that meant rough edges, but the LTS label made me less careful than I should have been. When Docker wouldn't set up through apt I did some research, late at night, not thoroughly. Found enough to confirm what I'd already half-decided: that I'd made a mistake not going with 24.04. I left it there.
 
+A few days later I actually checked the assumption. Docker has supported Ubuntu 26.04 since day one. The problem was a previous install attempt had created
 ```
-error Error port forwarding 6443: listen tcp 127.0.0.1:6443: bind: address already in use
-error Error port forwarding 10250: listen tcp 127.0.0.1:10250: bind: address already in use
+/etc/apt/sources.list.d/docker.list
 ```
+but left it empty. Added the repo properly and it worked immediately.
 
-These look alarming but aren't. devpod attempts to forward k3s-related ports from the container to the host. Because the container runs with `--network=host`, it shares citadel's network stack entirely — k3s already owns those ports on the host, and the container and host are the same network namespace. devpod's forwarding attempts fail immediately, which is the correct outcome. kubectl works fine.
+The course I'm following (KubeCraft HomeLabOS) is built around a Raspberry Pi. I'm adapting it for a Threadripper 1950X with 64GB RAM, more headroom, same approach. The idea is directory-based cluster isolation via devpod: each cluster lives in its own repo with its own kubeconfig and `.envrc`. direnv exports `KUBECONFIG` automatically when you cd in, so you can't accidentally kubectl at the wrong cluster.
 
-The other thing that needed correcting was where to run devpod commands from. The general devpod mental model is client on your workstation, Docker provider on the remote machine. That's not how this is set up. devpod is installed on citadel, at `~/.local/bin/devpod`, using the local docker provider. citadel is both the client and the host. The correct flow from fz55 is: `ssh citadel`, then `devpod ssh citadel-learning`. Running `devpod ssh citadel-learning` from fz55 gets `command not found`.
+Tools (flux, kubectl, k9s, direnv) are installed into the container via a dotfiles setup script on creation, not baked into the image. devpod up pulled the Debian base image, cloned the dotfiles, ran the setup script, and everything came up.
 
-Inside the container, the default user is `vscode` — the devcontainers base image creates that user regardless of whether VS Code is involved. It's part of the devcontainer standard.
+A few other things that needed sorting:
 
-direnv needs a one-time approval after container creation:
-
-```bash
-direnv allow
+devpod needs an SSH agent on the host to forward credentials into the container for cloning private repos. Set it up in the wrong place first; bashrc exits early for non-interactive shells, which is what devpod uses internally.
 ```
-
-After that, KUBECONFIG exports automatically on entry. Confirmed working:
-
-```
-kubectl get nodes
-NAME      STATUS   ROLES           AGE     VERSION
-citadel   Ready    control-plane   4d23h   v1.36.2+k3s1
+SSH_AUTH_SOCK needs to be in ~/.profile, not ~/.bashrc
 ```
 
-Cluster is reachable from inside the container. The stack is ready: kubectl, flux, k9s, direnv, zsh, neovim — all present. Starting the Kubecraft HomeLabOS curriculum from here.
+devpod also kills idle workspaces by default. First successful run shut itself down after a minute because nothing was connected to the browser UI.
+```
+devpod context set-options -o EXIT_AFTER_TIMEOUT=false
+```
+
+citadel's GitHub SSH key started as a deploy key scoped to the private dotfiles repo. GitHub won't let the same key be both a deploy key and an account-level key, so I ended up promoting it to account-level, which also means citadel can push directly rather than relaying through another machine.
+
+Container is running. k3s is already installed on citadel; next is starting the service, exporting the generated kubeconfig into the repo root, and running `direnv allow` so the container picks it up automatically.
