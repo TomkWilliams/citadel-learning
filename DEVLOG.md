@@ -87,3 +87,38 @@ devpod up --recreate citadel-learning
 The curriculum approach puts everything in `devcontainer.json` — the repo is self-documenting and someone can `git clone` + `devpod up` with no prior setup. Our approach relies on a devpod global setting (`dotfilesRepository`) that lives outside the repo, so reproduction requires knowing about that setting. The payoff is that the same dotfiles work everywhere and tool versions are managed centrally.
 
 Both approaches share the same KUBECONFIG pattern: `.envrc` + gitignored `kubeconfig` file per project directory. That's the core isolation mechanism regardless of how the tools get there.
+
+---
+
+## 2026-06-26 — Container workflow confirmed; devpod mental model corrected
+
+Ran `devpod up --recreate citadel-learning` to rebuild the container with the updated `devcontainer.json`. The terminal hung after the container came up — devpod holds the foreground SSH connection open rather than returning the prompt. Ctrl+C detaches cleanly; the container keeps running.
+
+A batch of port-forwarding errors appeared during startup:
+
+```
+error Error port forwarding 6443: listen tcp 127.0.0.1:6443: bind: address already in use
+error Error port forwarding 10250: listen tcp 127.0.0.1:10250: bind: address already in use
+```
+
+These look alarming but aren't. devpod attempts to forward k3s-related ports from the container to the host. Because the container runs with `--network=host`, it shares citadel's network stack entirely — k3s already owns those ports on the host, and the container and host are the same network namespace. devpod's forwarding attempts fail immediately, which is the correct outcome. kubectl works fine.
+
+The other thing that needed correcting was where to run devpod commands from. The general devpod mental model is client on your workstation, Docker provider on the remote machine. That's not how this is set up. devpod is installed on citadel, at `~/.local/bin/devpod`, using the local docker provider. citadel is both the client and the host. The correct flow from fz55 is: `ssh citadel`, then `devpod ssh citadel-learning`. Running `devpod ssh citadel-learning` from fz55 gets `command not found`.
+
+Inside the container, the default user is `vscode` — the devcontainers base image creates that user regardless of whether VS Code is involved. It's part of the devcontainer standard.
+
+direnv needs a one-time approval after container creation:
+
+```bash
+direnv allow
+```
+
+After that, KUBECONFIG exports automatically on entry. Confirmed working:
+
+```
+kubectl get nodes
+NAME      STATUS   ROLES           AGE     VERSION
+citadel   Ready    control-plane   4d23h   v1.36.2+k3s1
+```
+
+Cluster is reachable from inside the container. The stack is ready: kubectl, flux, k9s, direnv, zsh, neovim — all present. Starting the Kubecraft HomeLabOS curriculum from here.
