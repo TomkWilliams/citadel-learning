@@ -1,12 +1,5 @@
 {
   "image": "mcr.microsoft.com/devcontainers/base:debian",
-  "features": {
-    "ghcr.io/devcontainers/features/common-utils:2": {
-      "installZsh": true,
-      "configureZshAsDefaultShell": false
-    },
-    "ghcr.io/devcontainers/features/homebrew:1": {}
-  },
-  "postCreateCommand": "brew install neovim",
+  "postCreateCommand": "sudo apt-get update -qq && sudo apt-get install -y zsh neovim",
   "runArgs": ["--network=host"]
 }
