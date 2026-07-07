@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: citadel-docsync-checker-context-profile
+  namespace: citadel-learning
+  labels:
+    app.kubernetes.io/name: citadel-docsync-checker
+    app.kubernetes.io/part-of: citadel-agents
+data:
+  profile-name: multi-agent-core
+  sources.txt: |
+    AGENTS.md
+    CLAUDE.md
+    README.md
+    docs/multi-agent-runbook.md
+    agent-compat/README.md
+    agent-compat/agent-registry.md
+    agent-compat/citadel-hosting-zones.md
+    agent-compat/container-security-baseline.md
+    agent-compat/safety-boundaries.md
+    agent-compat/retrieval-policy.md
+    agent-compat/data-classification.md
+    agent-compat/identity-model.md
+    agent-compat/outbox-policy.md
+    agent-compat/resource-limits.md
+    agent-compat/kill-switches.md
+    agent-compat/mcp-registry.md
+    agent-compat/model-routing.md
+    agent-compat/evaluation-harness.md
+    agent-workflows/README.md
+    agent-workflows/claude-continuity-check.md
+    agent-workflows/adopt-agent-or-tool.md
+    agent-workflows/scope-check.md
+    agent-workflows/context-export.md
+  excluded.txt: |
+    full Obsidian vault
+    work vault
+    email content
+    homeinfra manifests
+    dotfiles
+    personal-platform
+    Kubernetes live state
+    Claude local settings
+    secrets or encrypted files

@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: citadel-docsync-checker-default-deny
+  namespace: citadel-learning
+  labels:
+    app.kubernetes.io/name: citadel-docsync-checker
+    app.kubernetes.io/part-of: citadel-agents
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: citadel-docsync-checker
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress: []
+
+# Add a separate, reviewed egress allow policy after the model endpoint is known.
+# Before relying on this policy, verify that the cluster CNI enforces
+# Kubernetes NetworkPolicy.
