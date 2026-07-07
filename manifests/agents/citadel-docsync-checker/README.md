@@ -41,6 +41,16 @@ Security baseline:
 | `job.yaml` | Hardened manual Job skeleton |
 | `networkpolicy.yaml` | Default-deny ingress/egress skeleton |
 
+## Apply Mode
+
+`kustomization.yaml` has `resources: []`, so `kubectl apply -k .` deploys nothing.
+That protection only holds for `-k`. Do not run `kubectl apply -f` or
+`kubectl apply -R -f` against the files in this directory directly — that
+bypasses the empty resource list and would create the ServiceAccount, ConfigMap,
+and NetworkPolicy for real (the Job would fail on the placeholder image, but the
+rest would apply). Only use `-k` until the checklist below is complete and the
+resources are uncommented.
+
 ## Activation Checklist
 
 - [ ] Build or select the agent image.
